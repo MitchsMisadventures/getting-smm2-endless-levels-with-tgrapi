@@ -1,0 +1,138 @@
+---
+title: "Download Endless Levels using TGR API"
+format: html
+---
+
+# Installing Packages
+
+Make sure to install the following packages as they are used to access the TGR API which will be used
+
+```{r installing-packages}
+# install.packages(c('httr', 'jsonlite', 'glue', 'dplyr', 'tidyr'))
+```
+
+Load the libraries
+
+```{r pacman}
+library(pacman)
+p_load(httr, jsonlite, glue, dplyr, tidyr)
+```
+
+# Importing the Data
+
+The data comes from the TGR API. We can use the GET command to be able to connect to the API and download a set of levels depending on certain parameters; count and difficulty.
+
+-   Count: How many levels we want to download
+-   Difficulty: What level do we want to pull levels from
+    -   "e" - easy
+
+    -   "n" - normal
+
+    -   "ex" - expert
+
+    -   "sex" - super expert
+
+While it would be really easy and efficient to get all the levels at once with a single function. I decided to allocate create a separate dataframe for each level difficulty. This way people can choose which difficulties they want to pull from or if they want to switch up the number of levels from a certain difficulties.
+
+***NOTE**:* I'm not exactly sure what the call limit is for a batch but I believe it's below 500. 250 works best if you want a decent amount of levels\*
+
+## Easy Levels
+
+```{r getting-easy-levels}
+
+N_easy = 50
+
+url <- glue('https://tgrcode.com/mm2/search_endless_mode?count={N_easy}&difficulty=e')
+res <- GET(url)
+data <- fromJSON(rawToChar(res$content))
+
+easy_df <- data$courses
+```
+
+## Normal Levels
+
+```{r getting-normal-levels}
+
+N_normal = 50
+
+url <- glue('https://tgrcode.com/mm2/search_endless_mode?count={N_normal}&difficulty=n')
+res <- GET(url)
+data <- fromJSON(rawToChar(res$content))
+
+normal_df <- data$courses
+```
+
+## Expert Levels
+
+```{r getting-expert-levels}
+
+N_expert = 50
+
+url <- glue('https://tgrcode.com/mm2/search_endless_mode?count={N_expert}&difficulty=ex')
+res <- GET(url)
+data <- fromJSON(rawToChar(res$content))
+
+expert_df <- data$courses
+```
+
+## Super Expert Levels
+
+```{r getting-super-expert-levels}
+
+N_se = 50
+
+url <- glue('https://tgrcode.com/mm2/search_endless_mode?count={N_se}&difficulty=sex')
+res <- GET(url)
+data <- fromJSON(rawToChar(res$content))
+
+se_df <- data$courses
+```
+
+# Combining All Dataframes Into One
+
+There is a bit of pre-processing that goes on. Originally, I thought that we could just stack the dataframes on top of each other but it turns out that each difficulty pulls out slightly different columns. Luckily for us, the columns that we would care about are at the beginning of the dataframe so we can just snip out the ending of the dataframes and have them line up.
+
+I also have a line of code that splits the tag names into their own columns. You have to do this since you can't export a .csv when there's a list in one of the columns. I think it looks nicer this way anyways and it makes it easy to do some sort of analysis.
+
+```{r combining-dfs}
+
+easy_df <- easy_df %>%
+  mutate(
+    tags_name = sapply(tags_name, toString),
+  )
+
+normal_df <- normal_df %>%
+  mutate(
+    tags_name = sapply(tags_name, toString),
+  )
+
+expert_df <- expert_df %>%
+  mutate(
+    tags_name = sapply(tags_name, toString),
+  )
+
+se_df <- se_df %>%
+  mutate(
+    tags_name = sapply(tags_name, toString),
+  )
+
+all_df <- bind_rows(
+  select(easy_df, 1:33),
+  select(normal_df, 1:33),
+  select(expert_df, 1:33),
+  select(se_df, 1:33)
+)
+
+all_df <- all_df %>%
+  separate(tags_name, into = c('tags_name_1', 'tags_name_2'), sep = ',', fill = 'right')
+
+all_df <- all_df %>%
+  select(-tags)
+
+```
+
+And now we can export!
+
+```{r exporting}
+# write.csv(all_df, "005_Endless_Batch.csv", row.names = FALSE, fileEncoding = "UTF-8")
+```
